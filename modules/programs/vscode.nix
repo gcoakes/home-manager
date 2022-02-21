@@ -135,6 +135,16 @@ in {
           or by Visual Studio Code.
         '';
       };
+
+      mutableUserSettings = mkOption {
+        type = types.bool;
+        default = false;
+        example = false;
+        description = ''
+          Whether user settings can be changed manually or by Visual
+          Studio Code.
+        '';
+      };
     };
   };
 
@@ -142,7 +152,7 @@ in {
     home.packages = [ cfg.package ];
 
     home.file = mkMerge [
-      (mkIf (cfg.userSettings != { }) {
+      (mkIf (!cfg.mutableUserSettings && cfg.userSettings != { }) {
         "${configFilePath}".source =
           jsonFormat.generate "vscode-user-settings" cfg.userSettings;
       })
@@ -172,5 +182,15 @@ in {
         "${extensionPath}".source = extensionsFolder;
       }))
     ];
+
+    home.activation = mkIf cfg.mutableUserSettings {
+      injectVscodeSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        tmp="$(mktemp)"
+        ${pkgs.jq}/bin/jq -s 'reduce .[] as $x ({}; . * $x)' "${
+          jsonFormat.generate "vscode-user-settings" cfg.userSettings
+        }" "${configFilePath}" > "$tmp"
+        mv "$tmp" "${configFilePath}"
+      '';
+    };
   };
 }
