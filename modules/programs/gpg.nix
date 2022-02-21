@@ -300,6 +300,9 @@ in
               else
                 QUIET_ARG=""
               fi
+              if [ ! -d "$GNUPGHOME" ]; then
+                $DRY_RUN_CMD install -m 0700 -d "$GNUPGHOME"
+              fi
               ${importTrustBashFunctions}
               ${importKeys}
               unset GNUPGHOME QUIET_ARG keyId importTrust
