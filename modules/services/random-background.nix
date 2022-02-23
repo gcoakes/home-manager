@@ -6,6 +6,14 @@ let
 
   cfg = config.services.random-background;
 
+  walScript = with pkgs;
+    writeShellScriptBin "random-background" ''
+      ${pywal}/bin/wal -i "${cfg.imageDirectory}" -n || exit 1
+      exec ${feh}/bin/feh ${flags} "$(< "${config.xdg.cacheHome}/wal/wal")"
+    '';
+
+  walDesc = if cfg.wal then "pywal and " else "";
+
   flags = lib.concatStringsSep " "
     ([ "--bg-${cfg.display}" "--no-fehbg" "--randomize" ]
       ++ lib.optional (!cfg.enableXinerama) "--no-xinerama");
@@ -63,6 +71,8 @@ in {
           screens.
         '';
       };
+
+      wal = mkEnableOption "wal color generation";
     };
   };
 
@@ -70,14 +80,18 @@ in {
     {
       systemd.user.services.random-background = {
         Unit = {
-          Description = "Set random desktop background using feh";
+          Description = "Set random desktop background using ${walDesc}feh";
           After = [ "graphical-session-pre.target" ];
           PartOf = [ "graphical-session.target" ];
         };
 
         Service = {
           Type = "oneshot";
-          ExecStart = "${pkgs.feh}/bin/feh ${flags} ${cfg.imageDirectory}";
+          ExecStart = if cfg.wal then
+            "${walScript}/bin/random-background"
+          else
+            "${pkgs.feh}/bin/feh ${flags} ${cfg.imageDirectory}";
+
           IOSchedulingClass = "idle";
         };
 
@@ -86,7 +100,9 @@ in {
     }
     (mkIf (cfg.interval != null) {
       systemd.user.timers.random-background = {
-        Unit = { Description = "Set random desktop background using feh"; };
+        Unit = {
+          Description = "Set random desktop background using ${walDesc}feh";
+        };
 
         Timer = { OnUnitActiveSec = cfg.interval; };
 
